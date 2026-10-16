@@ -28,7 +28,8 @@ export function formatNumber(n: number, s: Fmt, decimals = 2): string {
 
 export function formatMoney(amount: number, code: CurrencyCode, s: Fmt): string {
   const info = currencyInfo(code);
-  return `${numberFormat(s.digits, info.decimals).format(amount)} ${info.symbol}`;
+  // non-breaking space keeps the amount and its currency together
+  return `${numberFormat(s.digits, info.decimals).format(amount)}\u00A0${info.symbol}`;
 }
 
 export function formatRate(rate: number, s: Fmt): string {

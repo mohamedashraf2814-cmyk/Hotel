@@ -8,16 +8,20 @@ import { addDays, firstDayOfMonth, lastDayOfMonth } from '../lib/dates';
 import { downloadText } from '../lib/download';
 import { EXPENSE_CATEGORY_LABELS, PAYMENT_METHOD_LABELS, RESERVATION_STATUS_LABELS, ROOM_TYPE_LABELS } from '../lib/labels';
 import { guestById, reservationLabel, roomById, toBase } from '../lib/logic';
-import { expensesReport, occupancyReport, reservationsReport, revenueReport, type OccupancyRow, type ReservationReportRow } from '../lib/reports';
-import type { Expense, Payment, ReservationStatus } from '../lib/types';
+import { expensesReport, occupancyReport, reservationsReport, revenueReport, type OccupancyRow, type ReservationReportRow, type RevenueEntry } from '../lib/reports';
+import { departmentSummary } from '../lib/services';
+import { DEPARTMENT_LABELS } from '../lib/labels';
+import type { Department, Expense, ReservationStatus } from '../lib/types';
 import { roundCur } from '../lib/currencies';
 import { useData } from '../store/DataContext';
 
-type Tab = 'occupancy' | 'reservations' | 'revenue' | 'expenses';
+type Tab = 'occupancy' | 'reservations' | 'revenue' | 'services' | 'expenses';
+const SOURCE_LABELS: Record<RevenueEntry['source'], string> = { reservation: 'الإقامة', spa: 'السبا', restaurant: 'المطعم' };
 const TAB_LABELS: Record<Tab, string> = {
   occupancy: 'الإشغال',
   reservations: 'الحجوزات',
   revenue: 'الإيرادات',
+  services: 'السبا والمطعم',
   expenses: 'المصروفات',
 };
 
@@ -38,6 +42,10 @@ export default function Reports() {
   const resRep = useMemo(() => (validRange ? reservationsReport(data, range, (status || undefined) as ReservationStatus | undefined) : null), [data, from, to, validRange, status]);
   const rev = useMemo(() => (validRange ? revenueReport(data, range) : null), [data, from, to, validRange]);
   const exp = useMemo(() => (validRange ? expensesReport(data, range) : null), [data, from, to, validRange]);
+  const svc = useMemo(
+    () => (validRange ? (['spa', 'restaurant'] as Department[]).map((d) => departmentSummary(data, d, range)) : null),
+    [data, from, to, validRange],
+  );
 
   const preset = (kind: 'month' | 'last30' | 'year' | 'all') => {
     if (kind === 'month') {
@@ -95,11 +103,17 @@ export default function Reports() {
       downloadText(
         fileName('revenue'),
         toCsv(
-          ['التاريخ', 'الحجز', 'النزيل', 'الطريقة', 'العملة', 'المبلغ', 'سعر الصرف', `بالعملة الأساسية (${base})`, 'المرجع'],
-          rev.payments.map((p) => {
-            const r = data.reservations.find((x) => x.id === p.reservationId);
-            return [p.date, r ? reservationLabel(r) : '', r ? (guestById(data, r.guestId)?.fullName ?? '') : '', PAYMENT_METHOD_LABELS[p.method], p.currency, p.amount, p.rateToBase, toBase(p.amount, p.rateToBase, data.settings), p.reference];
-          }),
+          ['التاريخ', 'المصدر', 'المرجع', 'العميل', 'الطريقة', 'العملة', 'المبلغ', 'سعر الصرف', `بالعملة الأساسية (${base})`, 'مرجع العملية'],
+          rev.entries.map((e) => [e.date, SOURCE_LABELS[e.source], e.ref, e.customer, PAYMENT_METHOD_LABELS[e.method], e.currency, e.amount, e.rateToBase, e.base, e.reference]),
+        ),
+        'text/csv;charset=utf-8',
+      );
+    } else if (tab === 'services' && svc) {
+      downloadText(
+        fileName('spa-restaurant'),
+        toCsv(
+          ['القسم', 'العنصر', 'الكمية', `المبيعات (${base})`],
+          svc.flatMap((d) => d.topItems.map((i) => [DEPARTMENT_LABELS[d.department], i.name, i.qty, i.base])),
         ),
         'text/csv;charset=utf-8',
       );
@@ -149,19 +163,13 @@ export default function Reports() {
     { key: 'status', header: 'الحالة', render: (x) => <ReservationStatusBadge status={x.reservation.status} /> },
   ];
 
-  const payCols: Column<Payment>[] = [
-    { key: 'date', header: 'التاريخ', render: (p) => f.date(p.date), sort: (p) => p.date },
-    {
-      key: 'res',
-      header: 'الحجز',
-      render: (p) => {
-        const r = data.reservations.find((x) => x.id === p.reservationId);
-        return r ? `${reservationLabel(r)} — ${guestById(data, r.guestId)?.fullName ?? ''}` : '—';
-      },
-    },
-    { key: 'method', header: 'الطريقة', render: (p) => PAYMENT_METHOD_LABELS[p.method] },
-    { key: 'amount', header: 'المبلغ', render: (p) => <span className="num">{f.money(p.amount, p.currency)}</span>, sort: (p) => p.amount },
-    { key: 'base', header: 'بالعملة الأساسية', render: (p) => <span className="num">{f.base(toBase(p.amount, p.rateToBase, data.settings))}</span>, sort: (p) => toBase(p.amount, p.rateToBase, data.settings) },
+  const payCols: Column<RevenueEntry>[] = [
+    { key: 'date', header: 'التاريخ', render: (e) => f.date(e.date), sort: (e) => e.date },
+    { key: 'src', header: 'المصدر', render: (e) => SOURCE_LABELS[e.source], sort: (e) => e.source },
+    { key: 'ref', header: 'المرجع', render: (e) => (e.customer ? `${e.ref} — ${e.customer}` : e.ref) },
+    { key: 'method', header: 'الطريقة', render: (e) => PAYMENT_METHOD_LABELS[e.method] },
+    { key: 'amount', header: 'المبلغ', render: (e) => <span className="num">{f.money(e.amount, e.currency)}</span>, sort: (e) => e.amount },
+    { key: 'base', header: 'بالعملة الأساسية', render: (e) => <span className="num">{f.base(e.base)}</span>, sort: (e) => e.base },
   ];
 
   const expCols: Column<Expense>[] = [
@@ -265,6 +273,18 @@ export default function Reports() {
 
           {tab === 'revenue' && rev ? (
             <>
+              <Card title="حسب المصدر">
+                {rev.bySource.length === 0 ? (
+                  <span className="muted">لا توجد إيرادات.</span>
+                ) : (
+                  rev.bySource.map((b) => (
+                    <div className="legend-row" key={b.source}>
+                      <span>{SOURCE_LABELS[b.source]} <span className="muted">({f.int(b.count)})</span></span>
+                      <strong>{f.base(b.base)}</strong>
+                    </div>
+                  ))
+                )}
+              </Card>
               <div className="grid-2">
                 <Card title="حسب طريقة الدفع">
                   {rev.byMethod.length === 0 ? (
@@ -292,8 +312,34 @@ export default function Reports() {
                 </Card>
               </div>
               <Card title="تقرير الإيرادات" pad={false}>
-                <DataTable columns={payCols} rows={rev.payments} rowKey={(p) => p.id} pageSize={data.settings.pageSize} initialSort={{ key: 'date', dir: 'asc' }} empty={noData} />
+                <DataTable columns={payCols} rows={rev.entries} rowKey={(e) => e.id} pageSize={data.settings.pageSize} initialSort={{ key: 'date', dir: 'asc' }} empty={noData} />
               </Card>
+            </>
+          ) : null}
+
+          {tab === 'services' && svc ? (
+            <>
+              <Alert tone="info">
+                المبيعات تشمل الطلبات المحمّلة على الغرف والمدفوعة مباشرة (عدا الملغاة). المحمّل على الغرف يدخل الإيرادات عند سداد فاتورة الإقامة.
+              </Alert>
+              <div className="grid-2">
+                {svc.map((d) => (
+                  <Card key={d.department} title={DEPARTMENT_LABELS[d.department]}>
+                    <div className="legend-row"><span>عدد {d.department === 'spa' ? 'المواعيد' : 'الطلبات'}</span><strong>{f.int(d.count)}</strong></div>
+                    <div className="legend-row"><span>إجمالي المبيعات</span><strong>{f.base(d.salesBase)}</strong></div>
+                    <div className="legend-row"><span>على حساب الغرف</span><span>{f.base(d.roomChargedBase)}</span></div>
+                    <div className="legend-row"><span>دفع مباشر</span><span>{f.base(d.directBase)}</span></div>
+                    <h3 className="card-title" style={{ margin: '16px 0 6px' }}>حسب التصنيف</h3>
+                    {d.byCategory.length === 0 ? <span className="muted">لا توجد مبيعات.</span> : d.byCategory.map((c) => (
+                      <div className="legend-row" key={c.category}><span>{c.category} <span className="muted">({f.int(c.qty)})</span></span><strong>{f.base(c.base)}</strong></div>
+                    ))}
+                    <h3 className="card-title" style={{ margin: '16px 0 6px' }}>الأكثر طلبًا</h3>
+                    {d.topItems.length === 0 ? <span className="muted">—</span> : d.topItems.map((i) => (
+                      <div className="legend-row" key={i.name}><span>{i.name}</span><span className="num">{f.int(i.qty)} · {f.base(i.base)}</span></div>
+                    ))}
+                  </Card>
+                ))}
+              </div>
             </>
           ) : null}
 

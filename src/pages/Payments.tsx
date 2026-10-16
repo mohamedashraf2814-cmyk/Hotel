@@ -83,7 +83,7 @@ export default function Payments() {
           r,
           guestName: guestById(data, r.guestId)?.fullName ?? '—',
           roomNo: roomById(data, r.roomId)?.number ?? '—',
-          fin: reservationFinance(r, data.payments),
+          fin: reservationFinance(r, data.payments, data.orders),
         }))
         .filter((x) => (onlyDue === 'due' ? x.fin.balance > 0 : onlyDue === 'paid' ? x.fin.balance <= 0 : true))
         .filter((x) => !q.trim() || includesText(`${x.guestName} ${x.roomNo} ${reservationLabel(x.r)}`, q)),

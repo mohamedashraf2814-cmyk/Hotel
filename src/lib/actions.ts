@@ -292,8 +292,9 @@ export function validateReservation(
 
   // financial consistency: new total must not be lower than what was already paid
   if (existing && !Object.keys(e).length) {
-    const paid = reservationFinance(existing, data.payments).paid;
-    const newTotal = reservationTotals(input).total;
+    const fin = reservationFinance(existing, data.payments, data.orders);
+    const paid = fin.paid;
+    const newTotal = roundCur(reservationTotals(input).total + fin.extras, input.currency);
     if (paid > newTotal + 1e-9) e.discount = `المدفوع حتى الآن (${paid}) أكبر من الإجمالي الجديد (${newTotal}). عدّل الدفعات أولًا.`;
   }
   return e;
@@ -401,6 +402,8 @@ export function cancelReservation(data: AppData, id: string): ActionResult {
   if (!res) return failMsg('الحجز غير موجود.');
   const c = canCancel(res);
   if (!c.ok) return failMsg(c.error);
+  if (data.orders.some((o) => o.billing === 'room' && o.reservationId === id && o.status !== 'cancelled'))
+    return failMsg('على الحجز طلبات سبا أو مطعم محمّلة على الغرفة. ألغِ هذه الطلبات أولًا ثم ألغِ الحجز.');
   const t = nowIso();
   return {
     ok: true,
@@ -419,6 +422,8 @@ export function deleteReservation(data: AppData, id: string): ActionResult {
   if (res.status === 'checked_out') return failMsg('لا يمكن حذف حجز منتهٍ لأنه جزء من السجل التاريخي والمالي.');
   if (data.payments.some((p) => p.reservationId === id))
     return failMsg('لا يمكن حذف حجز عليه دفعات مسجلة. احذف الدفعات أولًا إن لزم، أو اكتفِ بإلغاء الحجز.');
+  if (data.orders.some((o) => o.reservationId === id))
+    return failMsg('لا يمكن حذف حجز مرتبط بطلبات سبا أو مطعم. اكتفِ بإلغاء الحجز بعد إلغاء الطلبات.');
   return { ok: true, id, data: { ...data, reservations: data.reservations.filter((r) => r.id !== id) } };
 }
 
@@ -468,7 +473,7 @@ export function validatePayment(
     else {
       const others = data.payments.filter((p) => p.reservationId === res.id && p.id !== opts.excludeId);
       const paid = others.reduce((s, p) => s + p.appliedAmount, 0);
-      const remaining = roundCur(reservationTotals(res).total - paid, res.currency);
+      const remaining = roundCur(reservationFinance(res, [], data.orders).total - paid, res.currency);
       const tol = 10 ** -currencyInfo(res.currency).decimals / 2;
       if (applied > remaining + tol) {
         e.amount = `المبلغ أكبر من المتبقي على الحجز (${remaining} ${currencyInfo(res.currency).symbol}).`;
@@ -656,7 +661,11 @@ export function validateSettings(data: AppData, s: Settings): FieldErrors {
   else if (s.currencies.find((c) => c.code === s.baseCurrency)?.rate !== 1) e.baseCurrency = 'سعر صرف العملة الأساسية يجب أن يكون 1.';
   if (!codes.has(s.defaultRoomCurrency)) e.defaultRoomCurrency = 'عملة الغرف الافتراضية يجب أن تكون ضمن العملات المفعّلة.';
 
-  if (!e.baseCurrency && s.baseCurrency !== data.settings.baseCurrency && (data.payments.length > 0 || data.expenses.length > 0))
+  if (
+    !e.baseCurrency &&
+    s.baseCurrency !== data.settings.baseCurrency &&
+    (data.payments.length > 0 || data.expenses.length > 0 || data.orders.some((o) => o.billing === 'direct' && o.settled))
+  )
     e.baseCurrency = 'لا يمكن تغيير العملة الأساسية بعد تسجيل دفعات أو مصروفات، حفاظًا على دقة السجلات المالية.';
 
   if (!e.currencies) {
@@ -665,6 +674,8 @@ export function validateSettings(data: AppData, s: Settings): FieldErrors {
       ...data.reservations.map((r) => r.currency),
       ...data.payments.map((p) => p.currency),
       ...data.expenses.map((x) => x.currency),
+      ...data.serviceItems.map((x) => x.currency),
+      ...data.orders.map((o) => o.currency),
     ]);
     for (const old of data.settings.currencies) {
       if (!codes.has(old.code) && inUse.has(old.code)) {

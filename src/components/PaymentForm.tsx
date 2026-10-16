@@ -47,11 +47,11 @@ export default function PaymentForm({
       .filter((r) => {
         if (payment && r.id === payment.reservationId) return true;
         if (r.status === 'cancelled') return false;
-        return reservationFinance(r, data.payments).balance > 0;
+        return reservationFinance(r, data.payments, data.orders).balance > 0;
       })
       .sort((a, b) => b.number - a.number)
       .map((r) => {
-        const fin = reservationFinance(r, data.payments);
+        const fin = reservationFinance(r, data.payments, data.orders);
         const g = guestById(data, r.guestId)?.fullName ?? '—';
         const rm = roomById(data, r.roomId)?.number ?? '—';
         return { value: r.id, label: `${reservationLabel(r)} — ${g} — غرفة ${rm} — المتبقي ${f.money(fin.balance, r.currency)}` };
@@ -59,7 +59,7 @@ export default function PaymentForm({
   }, [data, payment, f]);
 
   const res = data.reservations.find((r) => r.id === v.reservationId);
-  const finance = res ? reservationFinance(res, data.payments.filter((p) => p.id !== payment?.id)) : undefined;
+  const finance = res ? reservationFinance(res, data.payments.filter((p) => p.id !== payment?.id), data.orders) : undefined;
 
   const onReservationChange = (id: string) => {
     const r = data.reservations.find((x) => x.id === id);

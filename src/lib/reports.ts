@@ -1,7 +1,9 @@
 import { currencyInfo, roundCur } from './currencies';
 import { addDays, daysInclusive } from './dates';
 import { reservationFinance, toBase } from './logic';
-import type { AppData, CurrencyCode, Expense, ExpenseCategory, Payment, PaymentMethod, Reservation, Room } from './types';
+import { directOrderRevenueBase, orderLabel } from './services';
+import { orderTotals } from './logic';
+import type { AppData, CurrencyCode, Department, Expense, ExpenseCategory, Payment, PaymentMethod, Reservation, Room } from './types';
 
 export interface DateRange {
   from: string;
@@ -68,7 +70,7 @@ export function reservationsReport(data: AppData, range: DateRange, status?: Res
     .filter((r) => r.checkIn < end && r.checkOut > range.from && (!status || r.status === status))
     .sort((a, b) => (a.checkIn < b.checkIn ? -1 : a.checkIn > b.checkIn ? 1 : a.number - b.number))
     .map((r) => {
-      const f = reservationFinance(r, data.payments);
+      const f = reservationFinance(r, data.payments, data.orders);
       return { reservation: r, nights: f.nights, total: f.total, paid: f.paid, balance: f.balance };
     });
   const byStatus: Record<Reservation['status'], number> = { confirmed: 0, checked_in: 0, checked_out: 0, cancelled: 0 };
@@ -77,8 +79,26 @@ export function reservationsReport(data: AppData, range: DateRange, status?: Res
 }
 
 // ----- revenue -----
+/** One revenue entry: a reservation payment or a settled walk-in spa/restaurant order. */
+export interface RevenueEntry {
+  id: string;
+  date: string;
+  source: 'reservation' | Department;
+  ref: string;
+  reservationId: string;
+  customer: string;
+  method: PaymentMethod;
+  amount: number;
+  currency: CurrencyCode;
+  rateToBase: number;
+  base: number;
+  reference: string;
+}
+
 export interface RevenueReport {
   payments: Payment[];
+  entries: RevenueEntry[];
+  bySource: { source: 'reservation' | Department; base: number; count: number }[];
   totalBase: number;
   byMethod: { method: PaymentMethod; base: number; count: number }[];
   byCurrency: { currency: CurrencyCode; amount: number; base: number }[];
@@ -88,19 +108,61 @@ export function revenueReport(data: AppData, range: DateRange): RevenueReport {
     .filter((p) => p.date >= range.from && p.date <= range.to)
     .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.createdAt < b.createdAt ? -1 : 1));
   const base = data.settings.baseCurrency;
+  const entries: RevenueEntry[] = payments.map((p) => {
+    const r = data.reservations.find((x) => x.id === p.reservationId);
+    return {
+      id: p.id,
+      date: p.date,
+      source: 'reservation',
+      ref: r ? `#${String(r.number).padStart(4, '0')}` : '',
+      reservationId: p.reservationId,
+      customer: r ? (data.guests.find((g) => g.id === r.guestId)?.fullName ?? '') : '',
+      method: p.method,
+      amount: p.amount,
+      currency: p.currency,
+      rateToBase: p.rateToBase,
+      base: toBase(p.amount, p.rateToBase, data.settings),
+      reference: p.reference,
+    };
+  });
+  for (const o of data.orders) {
+    if (o.date < range.from || o.date > range.to) continue;
+    const b = directOrderRevenueBase(data, o);
+    if (!b) continue;
+    entries.push({
+      id: o.id,
+      date: o.date,
+      source: o.department,
+      ref: orderLabel(o),
+      reservationId: '',
+      customer: o.customerName,
+      method: o.method,
+      amount: orderTotals(o).total,
+      currency: o.currency,
+      rateToBase: o.rateToBase,
+      base: b,
+      reference: '',
+    });
+  }
+  entries.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+
   const m = new Map<PaymentMethod, { base: number; count: number }>();
   const c = new Map<CurrencyCode, { amount: number; base: number }>();
+  const src = new Map<RevenueEntry['source'], { base: number; count: number }>();
   let total = 0;
-  for (const p of payments) {
-    const b = toBase(p.amount, p.rateToBase, data.settings);
-    total += b;
-    const mm = m.get(p.method) ?? { base: 0, count: 0 };
-    m.set(p.method, { base: mm.base + b, count: mm.count + 1 });
-    const cc = c.get(p.currency) ?? { amount: 0, base: 0 };
-    c.set(p.currency, { amount: cc.amount + p.amount, base: cc.base + b });
+  for (const e of entries) {
+    total += e.base;
+    const mm = m.get(e.method) ?? { base: 0, count: 0 };
+    m.set(e.method, { base: mm.base + e.base, count: mm.count + 1 });
+    const cc = c.get(e.currency) ?? { amount: 0, base: 0 };
+    c.set(e.currency, { amount: cc.amount + e.amount, base: cc.base + e.base });
+    const ss = src.get(e.source) ?? { base: 0, count: 0 };
+    src.set(e.source, { base: ss.base + e.base, count: ss.count + 1 });
   }
   return {
     payments,
+    entries,
+    bySource: [...src.entries()].map(([source, v]) => ({ source, base: roundCur(v.base, base), count: v.count })),
     totalBase: roundCur(total, base),
     byMethod: [...m.entries()].map(([method, v]) => ({ method, base: roundCur(v.base, base), count: v.count })),
     byCurrency: [...c.entries()].map(([currency, v]) => ({

@@ -32,7 +32,7 @@ function ReservationView({ reservation, onClose, onPay }: { reservation: Reserva
   const f = useFmt();
   const guest = guestById(data, reservation.guestId);
   const room = roomById(data, reservation.roomId);
-  const fin = reservationFinance(reservation, data.payments);
+  const fin = reservationFinance(reservation, data.payments, data.orders);
   const pays = data.payments.filter((p) => p.reservationId === reservation.id).sort((a, b) => (a.date < b.date ? -1 : 1));
   return (
     <Modal
@@ -65,8 +65,8 @@ function ReservationView({ reservation, onClose, onPay }: { reservation: Reserva
       </dl>
       <div className="card" style={{ padding: 14, marginTop: 18, background: '#F8FAFC' }}>
         <dl className="kv kv-4">
-          <div><dt>سعر الليلة × {f.int(fin.nights)}</dt><dd>{f.money(fin.subtotal, reservation.currency)}</dd></div>
-          <div><dt>الخصم</dt><dd>{f.money(fin.discount, reservation.currency)}</dd></div>
+          <div><dt>الإقامة ({f.int(fin.nights)} ليلة، بعد الخصم)</dt><dd>{f.money(fin.roomTotal, reservation.currency)}</dd></div>
+          <div><dt>السبا والمطعم</dt><dd>{f.money(fin.extras, reservation.currency)}</dd></div>
           <div><dt>الإجمالي</dt><dd>{f.money(fin.total, reservation.currency)}</dd></div>
           <div><dt>المتبقي</dt><dd style={{ color: fin.balance > 0 ? 'var(--danger)' : 'var(--success)', fontWeight: 700 }}>{f.money(fin.balance, reservation.currency)}</dd></div>
         </dl>
@@ -132,7 +132,7 @@ export default function Reservations() {
           r,
           guestName: guestById(data, r.guestId)?.fullName ?? '—',
           roomNo: roomById(data, r.roomId)?.number ?? '—',
-          fin: reservationFinance(r, data.payments),
+          fin: reservationFinance(r, data.payments, data.orders),
         }))
         .filter((x) => {
           if (status && x.r.status !== status) return false;

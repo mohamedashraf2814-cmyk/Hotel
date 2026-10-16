@@ -4,7 +4,7 @@ export const SCHEMA_VERSION = 1;
 
 export function defaultSettings(): Settings {
   return {
-    hotelName: 'فندقي',
+    hotelName: 'Merak',
     phone: '',
     email: '',
     address: '',
@@ -28,6 +28,8 @@ export function emptyData(): AppData {
     reservations: [],
     payments: [],
     expenses: [],
-    counters: { reservation: 0 },
+    serviceItems: [],
+    orders: [],
+    counters: { reservation: 0, order: 0 },
   };
 }

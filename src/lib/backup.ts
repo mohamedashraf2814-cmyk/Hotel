@@ -6,9 +6,12 @@ import type {
   AppData,
   Expense,
   Guest,
+  OrderLine,
   Payment,
   Reservation,
   Room,
+  ServiceItem,
+  ServiceOrder,
   Settings,
 } from './types';
 
@@ -64,6 +67,16 @@ function oneOf<T extends string>(o: Obj, k: string, allowed: readonly T[], where
   if (typeof v !== 'string' || !allowed.includes(v as T)) bad(where, `قيمة غير صحيحة في الحقل «${k}»`);
   return v as T;
 }
+/** Collections added in later versions are optional so older backups still import. */
+function optArr(o: Obj, k: string): unknown[] {
+  if (o[k] === undefined) return [];
+  return arr(o, k);
+}
+function bool(o: Obj, k: string, where: string): boolean {
+  const v = o[k];
+  if (typeof v !== 'boolean') bad(where, `الحقل «${k}» يجب أن يكون صح/خطأ`);
+  return v;
+}
 function arr(o: Obj, k: string): unknown[] {
   const v = o[k];
   if (!Array.isArray(v)) bad('الملف', `القسم «${k}» مفقود أو غير صحيح`);
@@ -94,7 +107,8 @@ function parseSettings(raw: unknown): Settings {
   if (!currencies.some((c) => c.code === defaultRoomCurrency)) bad(w, 'عملة الغرف الافتراضية غير مفعّلة');
   const pageSize = num(raw, 'pageSize', w, { int: true });
   return {
-    hotelName: str(raw, 'hotelName', w, { max: 80 }) || d.hotelName,
+    // 'فندقي' was the default name of earlier versions; the product is now Merak
+    hotelName: ((n) => (!n || n === 'فندقي' ? d.hotelName : n))(str(raw, 'hotelName', w, { max: 80 })),
     phone: str(raw, 'phone', w, { optional: true, max: 30 }),
     email: str(raw, 'email', w, { optional: true, max: 120 }),
     address: str(raw, 'address', w, { optional: true, max: 200 }),
@@ -215,6 +229,63 @@ export function validateAppData(raw: unknown): { ok: true; data: AppData } | { o
       };
     });
 
+    const serviceItems: ServiceItem[] = optArr(raw, 'serviceItems').map((x, i) => {
+      const w = `عنصر الخدمات رقم ${i + 1}`;
+      if (!isObj(x)) bad(w, 'غير صحيح');
+      return {
+        id: str(x, 'id', w, { max: 80 }),
+        department: oneOf(x, 'department', ['spa', 'restaurant'] as const, w),
+        name: str(x, 'name', w, { max: 80 }),
+        category: str(x, 'category', w, { max: 40 }),
+        price: num(x, 'price', w, { positive: true }),
+        currency: cur(x, 'currency', w),
+        durationMin: num(x, 'durationMin', w, { int: true, min: 0 }),
+        description: str(x, 'description', w, { optional: true, max: 300 }),
+        active: bool(x, 'active', w),
+        createdAt: iso(x, 'createdAt', w),
+        updatedAt: iso(x, 'updatedAt', w),
+      };
+    });
+
+    const orders: ServiceOrder[] = optArr(raw, 'orders').map((x, i) => {
+      const w = `الطلب رقم ${i + 1}`;
+      if (!isObj(x)) bad(w, 'غير صحيح');
+      const linesRaw = x.lines;
+      if (!Array.isArray(linesRaw) || !linesRaw.length) bad(w, 'لا يحتوي على عناصر');
+      const lines: OrderLine[] = linesRaw.map((l) => {
+        if (!isObj(l)) bad(w, 'عنصر غير صحيح');
+        return {
+          itemId: str(l, 'itemId', w, { max: 80 }),
+          name: str(l, 'name', w, { max: 80 }),
+          qty: num(l, 'qty', w, { int: true, min: 1 }),
+          unitPrice: num(l, 'unitPrice', w, { min: 0 }),
+        };
+      });
+      const time = str(x, 'time', w, { max: 5 });
+      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) bad(w, 'الوقت غير صحيح');
+      return {
+        id: str(x, 'id', w, { max: 80 }),
+        number: num(x, 'number', w, { int: true, min: 1 }),
+        department: oneOf(x, 'department', ['spa', 'restaurant'] as const, w),
+        date: date(x, 'date', w),
+        time,
+        billing: oneOf(x, 'billing', ['room', 'direct'] as const, w),
+        reservationId: str(x, 'reservationId', w, { optional: true, max: 80 }),
+        customerName: str(x, 'customerName', w, { optional: true, max: 80 }),
+        place: str(x, 'place', w, { optional: true, max: 60 }),
+        lines,
+        currency: cur(x, 'currency', w),
+        discount: num(x, 'discount', w, { min: 0 }),
+        status: oneOf(x, 'status', ['open', 'completed', 'cancelled'] as const, w),
+        settled: bool(x, 'settled', w),
+        method: oneOf(x, 'method', PAYMENT_METHODS, w),
+        rateToBase: num(x, 'rateToBase', w, { positive: true }),
+        notes: str(x, 'notes', w, { optional: true, max: 300 }),
+        createdAt: iso(x, 'createdAt', w),
+        updatedAt: iso(x, 'updatedAt', w),
+      };
+    });
+
     // uniqueness & referential integrity
     const ensureUnique = (items: { id: string }[], label: string) => {
       const s = new Set<string>();
@@ -228,6 +299,8 @@ export function validateAppData(raw: unknown): { ok: true; data: AppData } | { o
     ensureUnique(reservations, 'الحجوزات');
     ensureUnique(payments, 'الدفعات');
     ensureUnique(expenses, 'المصروفات');
+    ensureUnique(serviceItems, 'قوائم السبا والمطعم');
+    ensureUnique(orders, 'الطلبات');
     const roomNums = new Set<string>();
     for (const r of rooms) {
       const k = r.number.trim().toLowerCase();
@@ -244,8 +317,13 @@ export function validateAppData(raw: unknown): { ok: true; data: AppData } | { o
     for (const p of payments) {
       if (!resIds.has(p.reservationId)) bad('الدفعات', 'توجد دفعة مرتبطة بحجز غير موجود');
     }
+    const itemIds = new Set(serviceItems.map((x) => x.id));
+    for (const o of orders) {
+      if (o.billing === 'room' && !resIds.has(o.reservationId)) bad('الطلبات', 'يوجد طلب محمّل على حجز غير موجود');
+      if (o.lines.some((l) => !itemIds.has(l.itemId))) bad('الطلبات', 'يوجد طلب يشير إلى عنصر غير موجود في القوائم');
+    }
     const enabled = new Set(settings.currencies.map((c) => c.code));
-    for (const code of [...rooms.map((r) => r.currency), ...reservations.map((r) => r.currency), ...payments.map((p) => p.currency), ...expenses.map((x) => x.currency)]) {
+    for (const code of [...rooms.map((r) => r.currency), ...reservations.map((r) => r.currency), ...payments.map((p) => p.currency), ...expenses.map((x) => x.currency), ...serviceItems.map((x) => x.currency), ...orders.map((o) => o.currency)]) {
       if (!enabled.has(code)) bad('العملات', `العملة ${code} مستخدمة في السجلات لكنها غير مفعّلة في الإعدادات`);
     }
     // overlapping active reservations are not allowed
@@ -259,13 +337,16 @@ export function validateAppData(raw: unknown): { ok: true; data: AppData } | { o
       }
     }
 
-    const maxNo = reservations.reduce((m, r) => Math.max(m, r.number), 0);
-    let counter = maxNo;
-    if (isObj(raw.counters) && typeof raw.counters.reservation === 'number' && Number.isInteger(raw.counters.reservation)) {
-      counter = Math.max(maxNo, raw.counters.reservation);
-    }
+    const counterOf = (key: 'reservation' | 'order', max: number) => {
+      const c = isObj(raw.counters) ? raw.counters[key] : undefined;
+      return typeof c === 'number' && Number.isInteger(c) ? Math.max(max, c) : max;
+    };
+    const counters = {
+      reservation: counterOf('reservation', reservations.reduce((m, r) => Math.max(m, r.number), 0)),
+      order: counterOf('order', orders.reduce((m, o) => Math.max(m, o.number), 0)),
+    };
 
-    return { ok: true, data: { settings, rooms, guests, reservations, payments, expenses, counters: { reservation: counter } } };
+    return { ok: true, data: { settings, rooms, guests, reservations, payments, expenses, serviceItems, orders, counters } };
   } catch (err) {
     if (err instanceof ValidationError) return { ok: false, error: err.message };
     return { ok: false, error: 'تعذّر قراءة البيانات.' };

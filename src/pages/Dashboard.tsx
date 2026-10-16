@@ -8,12 +8,16 @@ import {
   CheckCircle2,
   DoorClosed,
   DoorOpen,
+  Flower2,
   Hourglass,
   PiggyBank,
   Receipt,
+  UtensilsCrossed,
   Wallet,
   Wrench,
 } from 'lucide-react';
+import { orderLabel } from '../lib/services';
+import { orderTotals } from '../lib/logic';
 import { ReservationStatusBadge } from '../components/badges';
 import { Card, EmptyState, PageHeader, StatCard } from '../components/ui';
 import { useFmt, useToday } from '../hooks/useApp';
@@ -152,6 +156,48 @@ export default function Dashboard() {
             </div>
           )}
         </Card>
+      </div>
+
+      <div className="grid-2" style={{ marginTop: 20 }}>
+          <Card title="السبا اليوم" actions={<Link to="/spa" className="btn btn-ghost btn-sm">فتح السبا</Link>}>
+            <div className="mini-stats">
+              <Flower2 size={18} aria-hidden="true" />
+              <span>{f.int(s.spaToday.length)} موعد</span>
+              <span className="muted">مبيعات اليوم {f.base(s.spaSalesToday)}</span>
+            </div>
+            {s.spaToday.length === 0 ? (
+              <p className="muted" style={{ margin: 0 }}>لا توجد مواعيد اليوم.</p>
+            ) : (
+              s.spaToday.map((o) => (
+                <div className="legend-row" key={o.id}>
+                  <span>
+                    <strong className="ltr">{o.time}</strong> — {o.lines.map((l) => l.name).join('، ')}
+                    <span className="muted"> · {o.billing === 'room' ? (guestById(data, data.reservations.find((r) => r.id === o.reservationId)?.guestId ?? '')?.fullName ?? '') : o.customerName}</span>
+                  </span>
+                  <span className="muted">{o.status === 'completed' ? 'تمت' : o.place || orderLabel(o)}</span>
+                </div>
+              ))
+            )}
+          </Card>
+          <Card title="المطعم الآن" actions={<Link to="/restaurant" className="btn btn-ghost btn-sm">فتح المطعم</Link>}>
+            <div className="mini-stats">
+              <UtensilsCrossed size={18} aria-hidden="true" />
+              <span>{f.int(s.restaurantOpen.length)} طلب قيد التحضير</span>
+              <span className="muted">مبيعات اليوم {f.base(s.restaurantSalesToday)}</span>
+            </div>
+            {s.restaurantOpen.length === 0 ? (
+              <p className="muted" style={{ margin: 0 }}>لا توجد طلبات مفتوحة.</p>
+            ) : (
+              s.restaurantOpen.slice(0, 8).map((o) => (
+                <div className="legend-row" key={o.id}>
+                  <span>
+                    <strong>{orderLabel(o)}</strong> — {o.place || (o.billing === 'room' ? `غرفة ${roomById(data, data.reservations.find((r) => r.id === o.reservationId)?.roomId ?? '')?.number ?? ''}` : o.customerName)}
+                  </span>
+                  <span className="num">{f.money(orderTotals(o).total, o.currency)}</span>
+                </div>
+              ))
+            )}
+          </Card>
       </div>
 
       {s.revenueByCurrency.length > 0 ? (

@@ -6,7 +6,9 @@ import PaymentForm from '../components/PaymentForm';
 import { Button, EmptyState } from '../components/ui';
 import { useFmt, useToday } from '../hooks/useApp';
 import { RESERVATION_STATUS_LABELS, ROOM_TYPE_LABELS } from '../lib/labels';
-import { guestById, reservationFinance, reservationLabel, roomById } from '../lib/logic';
+import { guestById, orderTotals, reservationFinance, reservationLabel, roomById, roomChargesOf } from '../lib/logic';
+import { DEPARTMENT_LABELS } from '../lib/labels';
+import { orderLabel } from '../lib/services';
 import { useData } from '../store/DataContext';
 
 export default function Invoice() {
@@ -37,7 +39,8 @@ export default function Invoice() {
   const s = data.settings;
   const guest = guestById(data, res.guestId);
   const room = roomById(data, res.roomId);
-  const fin = reservationFinance(res, data.payments);
+  const fin = reservationFinance(res, data.payments, data.orders);
+  const charges = roomChargesOf(data.orders, res.id).sort((a, b) => (`${a.date} ${a.time}` < `${b.date} ${b.time}` ? -1 : 1));
   const pays = data.payments.filter((p) => p.reservationId === res.id).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.createdAt < b.createdAt ? -1 : 1));
   const invNo = `INV-${String(res.number).padStart(4, '0')}`;
 
@@ -110,12 +113,37 @@ export default function Invoice() {
               <td>{f.money(res.pricePerNight, res.currency)}</td>
               <td style={{ textAlign: 'end' }}>{f.money(fin.subtotal, res.currency)}</td>
             </tr>
+            {fin.discount > 0 ? (
+              <tr>
+                <td>خصم الإقامة</td>
+                <td>—</td>
+                <td>—</td>
+                <td style={{ textAlign: 'end' }}>- {f.money(fin.discount, res.currency)}</td>
+              </tr>
+            ) : null}
+            {charges.map((o) => {
+              const t = orderTotals(o);
+              return (
+                <tr key={o.id}>
+                  <td>
+                    {DEPARTMENT_LABELS[o.department]} — {o.lines.map((l) => (l.qty > 1 ? `${l.name} ×${l.qty}` : l.name)).join('، ')}
+                    <div className="muted" style={{ fontSize: 12 }}>
+                      {orderLabel(o)} · {f.date(o.date)} {o.time}
+                      {t.discount > 0 ? ` · خصم ${f.money(t.discount, res.currency)}` : ''}
+                    </div>
+                  </td>
+                  <td>{f.int(o.lines.reduce((a, l) => a + l.qty, 0))}</td>
+                  <td>—</td>
+                  <td style={{ textAlign: 'end' }}>{f.money(t.total, res.currency)}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
 
         <div className="totals">
-          <div><span>الإجمالي قبل الخصم</span><span>{f.money(fin.subtotal, res.currency)}</span></div>
-          {fin.discount > 0 ? <div><span>الخصم</span><span>- {f.money(fin.discount, res.currency)}</span></div> : null}
+          <div><span>الإقامة</span><span>{f.money(fin.roomTotal, res.currency)}</span></div>
+          {fin.extras > 0 ? <div><span>السبا والمطعم</span><span>{f.money(fin.extras, res.currency)}</span></div> : null}
           <div className="grand"><span>الإجمالي المستحق</span><span>{f.money(fin.total, res.currency)}</span></div>
           <div><span>المدفوع</span><span>{f.money(fin.paid, res.currency)}</span></div>
           <div className="grand" style={{ color: fin.balance > 0 ? 'var(--danger)' : 'var(--success)' }}>

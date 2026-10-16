@@ -10,6 +10,8 @@ const Reservations = lazy(() => import('./pages/Reservations'));
 const Reception = lazy(() => import('./pages/Reception'));
 const Payments = lazy(() => import('./pages/Payments'));
 const Invoice = lazy(() => import('./pages/Invoice'));
+const Spa = lazy(() => import('./pages/Spa'));
+const Restaurant = lazy(() => import('./pages/Restaurant'));
 const Expenses = lazy(() => import('./pages/Expenses'));
 const Reports = lazy(() => import('./pages/Reports'));
 const SettingsPage = lazy(() => import('./pages/Settings'));
@@ -27,6 +29,8 @@ export default function App() {
           <Route path="reception" element={<Reception />} />
           <Route path="payments" element={<Payments />} />
           <Route path="invoices/:reservationId" element={<Invoice />} />
+          <Route path="spa" element={<Spa />} />
+          <Route path="restaurant" element={<Restaurant />} />
           <Route path="expenses" element={<Expenses />} />
           <Route path="reports" element={<Reports />} />
           <Route path="settings" element={<SettingsPage />} />

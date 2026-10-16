@@ -7,6 +7,7 @@ import type {
   Reservation,
   Room,
   RoomStatus,
+  ServiceOrder,
   Settings,
 } from './types';
 
@@ -57,19 +58,51 @@ export function paymentsOf(payments: Payment[], reservationId: string): Payment[
   return payments.filter((p) => p.reservationId === reservationId);
 }
 
+// ---------- Spa / restaurant orders ----------
+
+export interface OrderTotals {
+  subtotal: number;
+  discount: number;
+  total: number;
+}
+
+export function orderTotals(o: Pick<ServiceOrder, 'lines' | 'discount' | 'currency'>): OrderTotals {
+  const subtotal = roundCur(
+    o.lines.reduce((s, l) => s + l.qty * l.unitPrice, 0),
+    o.currency,
+  );
+  const discount = Math.min(roundCur(o.discount || 0, o.currency), subtotal);
+  return { subtotal, discount, total: roundCur(Math.max(0, subtotal - discount), o.currency) };
+}
+
+/** Orders charged to a reservation's folio (cancelled orders excluded). */
+export function roomChargesOf(orders: ServiceOrder[], reservationId: string): ServiceOrder[] {
+  return orders.filter((o) => o.billing === 'room' && o.reservationId === reservationId && o.status !== 'cancelled');
+}
+
 export interface ReservationFinance extends ReservationTotals {
+  /** Room total (nights × price − discount). */
+  roomTotal: number;
+  /** Spa & restaurant charges posted to the room. */
+  extras: number;
   paid: number;
   balance: number;
 }
 
-export function reservationFinance(r: Reservation, payments: Payment[]): ReservationFinance {
+/** Folio of a reservation: room + room-charged services, minus payments. `total` is the grand total. */
+export function reservationFinance(r: Reservation, payments: Payment[], orders: ServiceOrder[] = []): ReservationFinance {
   const t = reservationTotals(r);
+  const extras = roundCur(
+    roomChargesOf(orders, r.id).reduce((s, o) => s + orderTotals(o).total, 0),
+    r.currency,
+  );
+  const total = roundCur(t.total + extras, r.currency);
   const paid = roundCur(
     paymentsOf(payments, r.id).reduce((s, p) => s + p.appliedAmount, 0),
     r.currency,
   );
-  const balance = roundCur(t.total - paid, r.currency);
-  return { ...t, paid, balance };
+  const balance = roundCur(total - paid, r.currency);
+  return { ...t, roomTotal: t.total, extras, total, paid, balance };
 }
 
 // ---------- Conflicts & room status ----------

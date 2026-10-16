@@ -125,8 +125,69 @@ export interface Settings {
   invoiceNote: string;
 }
 
+// ===== Spa & restaurant =====
+export type Department = 'spa' | 'restaurant';
+
+/** A spa treatment or a restaurant menu item. */
+export interface ServiceItem {
+  id: string;
+  department: Department;
+  name: string;
+  category: string;
+  price: number;
+  currency: CurrencyCode;
+  /** Spa only: duration in minutes (0 for restaurant items). */
+  durationMin: number;
+  description: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrderLine {
+  itemId: string;
+  /** Snapshot of the item name and unit price at order time. */
+  name: string;
+  qty: number;
+  unitPrice: number;
+}
+
+/**
+ * A restaurant order or a spa appointment.
+ * - billing "room": charged to a reservation's folio (paid later with the reservation payments).
+ * - billing "direct": a walk-in customer who settles on the spot; counted as revenue once settled.
+ */
+export type OrderStatus = 'open' | 'completed' | 'cancelled';
+export type OrderBilling = 'room' | 'direct';
+
+export interface ServiceOrder {
+  id: string;
+  number: number;
+  department: Department;
+  date: string;
+  /** "HH:MM" — appointment time for spa, order time for restaurant. */
+  time: string;
+  billing: OrderBilling;
+  reservationId: string;
+  customerName: string;
+  /** Restaurant: table / location. Spa: therapist name. */
+  place: string;
+  lines: OrderLine[];
+  currency: CurrencyCode;
+  discount: number;
+  status: OrderStatus;
+  /** Direct billing only: settlement details. */
+  settled: boolean;
+  method: PaymentMethod;
+  rateToBase: number;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Counters {
   reservation: number;
+  order: number;
 }
 
 export interface AppData {
@@ -136,6 +197,8 @@ export interface AppData {
   reservations: Reservation[];
   payments: Payment[];
   expenses: Expense[];
+  serviceItems: ServiceItem[];
+  orders: ServiceOrder[];
   counters: Counters;
 }
 

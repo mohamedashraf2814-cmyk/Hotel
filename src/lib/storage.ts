@@ -9,7 +9,9 @@
  *   reservations  Reservation[]
  *   payments      Payment[]
  *   expenses      Expense[]
- *   counters      sequence counters (reservation numbers are never reused)
+ *   serviceItems  ServiceItem[] — spa treatments and restaurant menu items
+ *   orders        ServiceOrder[] — spa appointments and restaurant orders
+ *   counters      sequence counters (reservation / order numbers are never reused)
  *   corrupt:*     raw copy of any value that failed to parse, kept so nothing is silently lost
  *
  * localStorage is per-browser, per-device and NOT secure. If it is unavailable the
@@ -20,7 +22,7 @@ import { validateAppData } from './backup';
 import type { AppData } from './types';
 
 export const PREFIX = 'hms:v1:';
-const COLLECTION_KEYS = ['settings', 'rooms', 'guests', 'reservations', 'payments', 'expenses', 'counters'] as const;
+const COLLECTION_KEYS = ['settings', 'rooms', 'guests', 'reservations', 'payments', 'expenses', 'serviceItems', 'orders', 'counters'] as const;
 type CollectionKey = (typeof COLLECTION_KEYS)[number];
 
 const memory = new Map<string, string>();

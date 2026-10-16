@@ -43,7 +43,7 @@ function GuestView({ guest, onClose }: { guest: Guest; onClose: () => void }) {
       ) : (
         <div className="stack" style={{ gap: 8 }}>
           {list.map((r) => {
-            const fin = reservationFinance(r, data.payments);
+            const fin = reservationFinance(r, data.payments, data.orders);
             return (
               <div key={r.id} className="card" style={{ padding: 12 }}>
                 <div className="row" style={{ justifyContent: 'space-between' }}>

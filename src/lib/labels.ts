@@ -1,4 +1,6 @@
 import type {
+  Department,
+  OrderStatus,
   ExpenseCategory,
   IdType,
   ManualRoomStatus,
@@ -58,4 +60,20 @@ export const ID_TYPE_LABELS: Record<IdType, string> = {
   passport: 'جواز سفر',
   driving_license: 'رخصة قيادة',
   other: 'أخرى',
+};
+
+export const DEPARTMENT_LABELS: Record<Department, string> = {
+  spa: 'السبا',
+  restaurant: 'المطعم',
+};
+
+export const ORDER_STATUS_LABELS: Record<Department, Record<OrderStatus, string>> = {
+  spa: { open: 'موعد محجوز', completed: 'تمت الجلسة', cancelled: 'ملغي' },
+  restaurant: { open: 'قيد التحضير', completed: 'تم التقديم', cancelled: 'ملغي' },
+};
+
+/** Suggested categories (the user can type any category). */
+export const CATEGORY_SUGGESTIONS: Record<Department, string[]> = {
+  spa: ['مساج', 'عناية بالبشرة', 'حمام مغربي', 'ساونا وبخار', 'عناية بالأظافر', 'باقات'],
+  restaurant: ['إفطار', 'مقبلات', 'أطباق رئيسية', 'مشويات', 'حلويات', 'مشروبات ساخنة', 'مشروبات باردة'],
 };

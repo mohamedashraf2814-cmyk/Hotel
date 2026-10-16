@@ -85,14 +85,14 @@ export default function Reception() {
     key: 'balance',
     header: 'المتبقي',
     render: (r) => {
-      const fin = reservationFinance(r, data.payments);
+      const fin = reservationFinance(r, data.payments, data.orders);
       return <span style={{ color: fin.balance > 0 ? 'var(--danger)' : 'var(--success)' }}>{f.money(fin.balance, r.currency)}</span>;
     },
-    sort: (r) => reservationFinance(r, data.payments).balance,
+    sort: (r) => reservationFinance(r, data.payments, data.orders).balance,
   };
 
   const payBtn = (r: Reservation) =>
-    reservationFinance(r, data.payments).balance > 0 ? (
+    reservationFinance(r, data.payments, data.orders).balance > 0 ? (
       <Button small onClick={() => setPaying(r.id)}>
         <Wallet size={15} /> دفعة
       </Button>
@@ -165,7 +165,7 @@ export default function Reception() {
     },
   ]);
 
-  const outBalance = checkOut ? reservationFinance(checkOut, data.payments) : undefined;
+  const outBalance = checkOut ? reservationFinance(checkOut, data.payments, data.orders) : undefined;
   const inRoom = checkIn ? roomById(data, checkIn.roomId) : undefined;
 
   return (
