@@ -18,7 +18,7 @@ import {
   TextField,
   type Column,
 } from '../components/ui';
-import { useFmt } from '../hooks/useApp';
+import { useFmt, useOpenNew } from '../hooks/useApp';
 import { cancelReservation, deleteReservation } from '../lib/actions';
 import { RESERVATION_STATUS_LABELS } from '../lib/labels';
 import { guestById, reservationFinance, reservationLabel, roomById, type ReservationFinance } from '../lib/logic';
@@ -121,6 +121,7 @@ export default function Reservations() {
   const [to, setTo] = useState('');
   const [editing, setEditing] = useState<Reservation | 'new' | null>(null);
   const [viewing, setViewing] = useState<string | null>(null);
+  useOpenNew(() => setEditing('new'));
   const [paying, setPaying] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<Reservation | null>(null);
   const [deleting, setDeleting] = useState<Reservation | null>(null);

@@ -14,7 +14,7 @@ import {
   SearchBox,
   type Column,
 } from '../components/ui';
-import { useFmt } from '../hooks/useApp';
+import { useFmt, useOpenNew } from '../hooks/useApp';
 import { deleteGuest } from '../lib/actions';
 import { ID_TYPE_LABELS } from '../lib/labels';
 import { reservationFinance, reservationLabel, roomById } from '../lib/logic';
@@ -70,6 +70,7 @@ export default function Guests() {
   const [q, setQ] = useState('');
   const [editing, setEditing] = useState<Guest | 'new' | null>(null);
   const [viewing, setViewing] = useState<string | null>(null);
+  useOpenNew(() => setEditing('new'));
   const [deleting, setDeleting] = useState<Guest | null>(null);
 
   const rows = useMemo(

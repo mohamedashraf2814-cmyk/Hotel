@@ -10,6 +10,9 @@ import {
   DoorOpen,
   Flower2,
   Hourglass,
+  Sparkles,
+  Plus,
+  AlertCircle,
   PiggyBank,
   Receipt,
   UtensilsCrossed,
@@ -35,6 +38,16 @@ const STATUS_COLORS: Record<RoomStatus, string> = {
   maintenance: '#64748B',
 };
 
+const RING = 2 * Math.PI * 52;
+
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 5) return 'مساء الخير';
+  if (h < 12) return 'صباح الخير';
+  if (h < 18) return 'نهارك سعيد';
+  return 'مساء الخير';
+}
+
 export default function Dashboard() {
   const { data } = useData();
   const f = useFmt();
@@ -48,11 +61,69 @@ export default function Dashboard() {
     [data.rooms, data.reservations, today],
   );
 
+  const attention = useMemo(() => {
+    const out: { text: string; to: string }[] = [];
+    if (s.departuresToday.length) out.push({ text: `${f.int(s.departuresToday.length)} مغادرة بانتظار التسجيل`, to: '/reception' });
+    if (s.arrivalsToday.length) out.push({ text: `${f.int(s.arrivalsToday.length)} وصول بانتظار التسجيل`, to: '/reception' });
+    if (s.outstandingBase > 0) out.push({ text: `أرصدة مستحقة ${f.base(s.outstandingBase)}`, to: '/payments' });
+    if (s.byStatus.cleaning) out.push({ text: `${f.int(s.byStatus.cleaning)} غرفة قيد التنظيف`, to: '/rooms' });
+    if (s.restaurantOpen.length) out.push({ text: `${f.int(s.restaurantOpen.length)} طلب مطعم مفتوح`, to: '/restaurant' });
+    return out;
+  }, [s, f]);
+
   const isEmpty = data.rooms.length === 0 && data.reservations.length === 0;
 
   return (
     <>
       <PageHeader title="لوحة التحكم" subtitle={`نظرة عامة على ${data.settings.hotelName} — ${f.date(today)}`} />
+
+
+      <section className="hero" aria-label="ملخص اليوم">
+        <div className="hero-main">
+          <div className="hero-hello">{greeting()}</div>
+          <h2 className="hero-title">{data.settings.hotelName || 'Merak'}</h2>
+          <p className="hero-sub">
+            {s.arrivalsToday.length + s.departuresToday.length === 0
+              ? 'لا توجد حركة وصول أو مغادرة اليوم.'
+              : `${f.int(s.arrivalsToday.length)} وصول و${f.int(s.departuresToday.length)} مغادرة اليوم.`}
+          </p>
+          <div className="hero-actions">
+            <Link to="/reservations?new=1" className="hero-btn primary">
+              <Plus size={17} aria-hidden="true" /> حجز جديد
+            </Link>
+            <Link to="/reception" className="hero-btn">الاستقبال</Link>
+            <Link to="/restaurant?new=1" className="hero-btn">طلب مطعم</Link>
+            <Link to="/spa?new=1" className="hero-btn">موعد سبا</Link>
+          </div>
+        </div>
+        <div className="hero-ring" role="img" aria-label={`نسبة الإشغال ${f.int(s.occupancyRate)}%`}>
+          <svg viewBox="0 0 120 120" width="148" height="148">
+            <circle cx="60" cy="60" r="52" className="ring-bg" />
+            <circle
+              cx="60"
+              cy="60"
+              r="52"
+              className="ring-fg"
+              style={{ ['--off' as string]: String(RING * (1 - Math.min(100, s.occupancyRate) / 100)), strokeDasharray: RING }}
+            />
+          </svg>
+          <div className="ring-text">
+            <strong>{f.int(s.occupancyRate)}%</strong>
+            <span>إشغال</span>
+          </div>
+        </div>
+      </section>
+
+      {attention.length ? (
+        <div className="attention" role="list" aria-label="يحتاج انتباهك">
+          <span className="attention-title"><Sparkles size={16} aria-hidden="true" /> يحتاج انتباهك</span>
+          {attention.map((a) => (
+            <Link key={a.text} to={a.to} className="attn" role="listitem">
+              <AlertCircle size={15} aria-hidden="true" /> {a.text}
+            </Link>
+          ))}
+        </div>
+      ) : null}
 
       {isEmpty ? (
         <div className="card" style={{ marginBottom: 20 }}>
@@ -75,18 +146,18 @@ export default function Dashboard() {
       ) : null}
 
       <div className="grid-stats">
-        <StatCard icon={<BedDouble size={22} />} label="إجمالي الغرف" value={f.int(s.totalRooms)} />
-        <StatCard icon={<DoorOpen size={22} />} label="غرف متاحة" value={f.int(s.byStatus.available)} tone="success" />
-        <StatCard icon={<DoorClosed size={22} />} label="غرف مشغولة" value={f.int(s.byStatus.occupied)} tone="danger" sub={`نسبة الإشغال ${f.int(s.occupancyRate)}%`} />
-        <StatCard icon={<CalendarCheck size={22} />} label="غرف محجوزة" value={f.int(s.byStatus.reserved)} />
-        <StatCard icon={<ArrowDownToLine size={22} />} label="وصول اليوم" value={f.int(s.arrivalsToday.length)} sub="بانتظار تسجيل الوصول" />
-        <StatCard icon={<ArrowUpFromLine size={22} />} label="مغادرة اليوم" value={f.int(s.departuresToday.length)} sub="بانتظار تسجيل المغادرة" tone="warning" />
-        <StatCard icon={<Hourglass size={22} />} label="الحجوزات النشطة" value={f.int(s.activeReservations)} />
-        <StatCard icon={<Wrench size={22} />} label="تنظيف / صيانة" value={f.int(s.byStatus.cleaning + s.byStatus.maintenance)} tone="warning" />
-        <StatCard icon={<Wallet size={22} />} label="الإيرادات المسجلة" value={f.base(s.revenueBase)} tone="success" sub="بالعملة الأساسية" />
-        <StatCard icon={<Receipt size={22} />} label="المصروفات المسجلة" value={f.base(s.expensesBase)} tone="danger" sub="بالعملة الأساسية" />
-        <StatCard icon={<PiggyBank size={22} />} label="صافي الربح" value={f.base(s.netBase)} tone={s.netBase < 0 ? 'danger' : 'success'} />
-        <StatCard icon={<CheckCircle2 size={22} />} label="أرصدة مستحقة" value={f.base(s.outstandingBase)} tone="warning" sub="المتبقي على الحجوزات" />
+        <StatCard index={0} icon={<BedDouble size={22} />} label="إجمالي الغرف" value={f.int(s.totalRooms)} />
+        <StatCard index={1} icon={<DoorOpen size={22} />} label="غرف متاحة" value={f.int(s.byStatus.available)} tone="success" />
+        <StatCard index={2} icon={<DoorClosed size={22} />} label="غرف مشغولة" value={f.int(s.byStatus.occupied)} tone="danger" sub={`نسبة الإشغال ${f.int(s.occupancyRate)}%`} />
+        <StatCard index={3} icon={<CalendarCheck size={22} />} label="غرف محجوزة" value={f.int(s.byStatus.reserved)} />
+        <StatCard index={4} icon={<ArrowDownToLine size={22} />} label="وصول اليوم" value={f.int(s.arrivalsToday.length)} sub="بانتظار تسجيل الوصول" />
+        <StatCard index={5} icon={<ArrowUpFromLine size={22} />} label="مغادرة اليوم" value={f.int(s.departuresToday.length)} sub="بانتظار تسجيل المغادرة" tone="warning" />
+        <StatCard index={6} icon={<Hourglass size={22} />} label="الحجوزات النشطة" value={f.int(s.activeReservations)} />
+        <StatCard index={7} icon={<Wrench size={22} />} label="تنظيف / صيانة" value={f.int(s.byStatus.cleaning + s.byStatus.maintenance)} tone="warning" />
+        <StatCard index={8} icon={<Wallet size={22} />} label="الإيرادات المسجلة" value={f.base(s.revenueBase)} tone="success" sub="بالعملة الأساسية" />
+        <StatCard index={9} icon={<Receipt size={22} />} label="المصروفات المسجلة" value={f.base(s.expensesBase)} tone="danger" sub="بالعملة الأساسية" />
+        <StatCard index={10} icon={<PiggyBank size={22} />} label="صافي الربح" value={f.base(s.netBase)} tone={s.netBase < 0 ? 'danger' : 'success'} />
+        <StatCard index={11} icon={<CheckCircle2 size={22} />} label="أرصدة مستحقة" value={f.base(s.outstandingBase)} tone="warning" sub="المتبقي على الحجوزات" />
       </div>
 
       <div className="grid-2" style={{ marginTop: 20 }}>

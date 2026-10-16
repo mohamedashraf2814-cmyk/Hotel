@@ -13,6 +13,7 @@ import {
   type TextareaHTMLAttributes,
 } from 'react';
 import { AlertTriangle, ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Inbox, Search, X } from 'lucide-react';
+import { CountUp } from './CountUp';
 
 // ---------- Buttons ----------
 type Variant = 'primary' | 'secondary' | 'danger' | 'success' | 'ghost';
@@ -75,13 +76,13 @@ export function Card({ title, actions, children, pad = true, className = '' }: {
   );
 }
 
-export function StatCard({ icon, label, value, sub, tone }: { icon: ReactNode; label: string; value: ReactNode; sub?: ReactNode; tone?: 'success' | 'warning' | 'danger' }) {
+export function StatCard({ icon, label, value, sub, tone, index = 0 }: { icon: ReactNode; label: string; value: ReactNode; sub?: ReactNode; tone?: 'success' | 'warning' | 'danger'; index?: number }) {
   return (
-    <div className="card stat">
+    <div className={`card stat ${tone ? `tone-${tone}` : ''}`} style={{ ['--i' as string]: index }}>
       <div className={`stat-icon ${tone ?? ''}`}>{icon}</div>
       <div style={{ minWidth: 0 }}>
         <div className="stat-label">{label}</div>
-        <div className="stat-value">{value}</div>
+        <div className="stat-value">{typeof value === 'string' ? <CountUp text={value} /> : value}</div>
         {sub ? <div className="stat-sub">{sub}</div> : null}
       </div>
     </div>

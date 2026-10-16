@@ -1,63 +1,33 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import {
-  BarChart3,
-  BedDouble,
-  CalendarCheck,
-  ConciergeBell,
-  CreditCard,
-  Flower2,
-  LayoutDashboard,
-  LogOut,
-  Menu,
-  Receipt,
-  Settings as SettingsIcon,
-  Users,
-  UtensilsCrossed,
-  X,
-} from 'lucide-react';
+import { LogOut, Menu, Search, X } from 'lucide-react';
+import { CommandPalette } from '../components/CommandPalette';
+import { NAV } from './nav';
 import { Alert, IconButton } from '../components/ui';
 import { useAuth } from '../store/AuthContext';
 import { useData } from '../store/DataContext';
-
-const NAV = [
-  {
-    group: 'الفندق',
-    items: [
-      { to: '/', label: 'لوحة التحكم', icon: LayoutDashboard, end: true },
-      { to: '/reception', label: 'الاستقبال', icon: ConciergeBell },
-      { to: '/reservations', label: 'الحجوزات', icon: CalendarCheck },
-      { to: '/rooms', label: 'الغرف', icon: BedDouble },
-      { to: '/guests', label: 'النزلاء', icon: Users },
-    ],
-  },
-  {
-    group: 'الخدمات',
-    items: [
-      { to: '/spa', label: 'السبا', icon: Flower2 },
-      { to: '/restaurant', label: 'المطعم', icon: UtensilsCrossed },
-    ],
-  },
-  {
-    group: 'الحسابات',
-    items: [
-      { to: '/payments', label: 'المدفوعات والفواتير', icon: CreditCard },
-      { to: '/expenses', label: 'المصروفات', icon: Receipt },
-      { to: '/reports', label: 'التقارير', icon: BarChart3 },
-      { to: '/settings', label: 'الإعدادات', icon: SettingsIcon },
-    ],
-  },
-];
 
 export default function AppLayout() {
   const { data, persistent, warnings, dismissWarnings } = useData();
   const { logout } = useAuth();
   const [open, setOpen] = useState(false);
+  const [cmd, setCmd] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
     setOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setCmd((v) => !v);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
 
   useEffect(() => {
     document.title = data.settings.hotelName && data.settings.hotelName !== 'Merak' ? `Merak — ${data.settings.hotelName}` : 'Merak — إدارة الفندق';
@@ -74,6 +44,11 @@ export default function AppLayout() {
             <div className="brand-sub">{data.settings.hotelName && data.settings.hotelName !== 'Merak' ? data.settings.hotelName : 'Hotel & Spa'}</div>
           </div>
         </div>
+        <button type="button" className="cmd-trigger" onClick={() => setCmd(true)}>
+          <Search size={16} aria-hidden="true" />
+          <span>بحث سريع</span>
+          <kbd>Ctrl K</kbd>
+        </button>
         <nav className="nav">
           {NAV.map((g) => (
             <div key={g.group} role="group" aria-label={g.group} style={{ display: 'contents' }}>
@@ -101,6 +76,11 @@ export default function AppLayout() {
             {open ? <X size={22} /> : <Menu size={22} />}
           </IconButton>
           <strong style={{ fontFamily: '"Cormorant Garamond", Georgia, serif', letterSpacing: '.14em', fontSize: 19 }}>MERAK</strong>
+          <span style={{ marginInlineStart: 'auto' }}>
+            <IconButton label="فتح لوحة الأوامر" onClick={() => setCmd(true)}>
+              <Search size={20} />
+            </IconButton>
+          </span>
         </header>
         <main className="content">
           {!persistent ? (
@@ -124,9 +104,12 @@ export default function AppLayout() {
               </div>
             </div>
           ) : null}
-          <Outlet />
+          <div key={location.pathname} className="page-enter">
+            <Outlet />
+          </div>
         </main>
       </div>
+      {cmd ? <CommandPalette onClose={() => setCmd(false)} /> : null}
     </div>
   );
 }

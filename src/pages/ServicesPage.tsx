@@ -20,7 +20,7 @@ import {
   TextField,
   type Column,
 } from '../components/ui';
-import { useFmt, useToday } from '../hooks/useApp';
+import { useFmt, useToday, useOpenNew } from '../hooks/useApp';
 import { PAYMENT_METHODS } from '../lib/actions';
 import { roundCur } from '../lib/currencies';
 import { CATEGORY_SUGGESTIONS, ORDER_STATUS_LABELS, PAYMENT_METHOD_LABELS } from '../lib/labels';
@@ -233,6 +233,7 @@ export default function ServicesPage({ department }: { department: Department })
   const [cancelling, setCancelling] = useState<ServiceOrder | null>(null);
   const [deletingOrder, setDeletingOrder] = useState<ServiceOrder | null>(null);
   const [editingItem, setEditingItem] = useState<ServiceItem | 'new' | null>(null);
+  useOpenNew(() => setEditingOrder('new'));
   const [deletingItem, setDeletingItem] = useState<ServiceItem | null>(null);
 
   const orders = useMemo(() => data.orders.filter((o) => o.department === department), [data.orders, department]);

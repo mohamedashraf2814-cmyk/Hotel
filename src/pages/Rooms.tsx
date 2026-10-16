@@ -17,7 +17,7 @@ import {
   TextField,
   type Column,
 } from '../components/ui';
-import { useFmt, useToday } from '../hooks/useApp';
+import { useFmt, useToday, useOpenNew } from '../hooks/useApp';
 import { ROOM_TYPES, addRoom, deleteRoom, setRoomStatus, updateRoom, type RoomInput } from '../lib/actions';
 import { MANUAL_ROOM_STATUSES, ROOM_STATUS_LABELS, ROOM_TYPE_LABELS } from '../lib/labels';
 import { effectiveRoomStatus, guestById, reservationLabel } from '../lib/logic';
@@ -161,6 +161,7 @@ export default function Rooms() {
   const [typeFilter, setTypeFilter] = useState('');
   const [editing, setEditing] = useState<Room | 'new' | null>(null);
   const [viewing, setViewing] = useState<Room | null>(null);
+  useOpenNew(() => setEditing('new'));
   const [deleting, setDeleting] = useState<Room | null>(null);
 
   const rows = useMemo(

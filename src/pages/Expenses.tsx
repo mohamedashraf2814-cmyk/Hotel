@@ -16,7 +16,7 @@ import {
   TextField,
   type Column,
 } from '../components/ui';
-import { useFmt, useToday } from '../hooks/useApp';
+import { useFmt, useToday, useOpenNew } from '../hooks/useApp';
 import { EXPENSE_CATEGORIES, addExpense, deleteExpense, updateExpense, type ExpenseInput } from '../lib/actions';
 import { roundCur } from '../lib/currencies';
 import { EXPENSE_CATEGORY_LABELS } from '../lib/labels';
@@ -133,6 +133,7 @@ export default function Expenses() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [editing, setEditing] = useState<Expense | 'new' | null>(null);
+  useOpenNew(() => setEditing('new'));
   const [deleting, setDeleting] = useState<Expense | null>(null);
 
   const rows = useMemo(
