@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Eye, EyeOff, LogIn } from 'lucide-react';
-import { Button, IconButton } from '../components/ui';
+import { BedDouble, Eye, EyeOff, Flower2, LogIn, Receipt, UtensilsCrossed } from 'lucide-react';
+import { IconButton } from '../components/ui';
 
 export default function Login({ onLogin }: { onLogin: (u: string, p: string, remember: boolean) => boolean }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [remember, setRemember] = useState(true);
+  const [remember, setRemember] = useState(false);
   const [show, setShow] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [shake, setShake] = useState(false);
 
   useEffect(() => {
     document.title = 'Merak — تسجيل الدخول';
@@ -29,33 +30,49 @@ export default function Login({ onLogin }: { onLogin: (u: string, p: string, rem
       if (!ok) {
         setError('اسم المستخدم أو كلمة المرور غير صحيحة.');
         setPassword('');
+        setShake(true);
+        window.setTimeout(() => setShake(false), 450);
       }
     }, 350);
   };
 
   return (
     <div className="login">
+      <div className="login-bg" aria-hidden="true">
+        <span className="orb o1" />
+        <span className="orb o2" />
+      </div>
+
       <section className="login-art" aria-hidden="true">
-        <div className="wordmark">Merak · Hotel &amp; Spa</div>
-        <div style={{ position: 'relative', zIndex: 1 }}>
+        <div className="wordmark">MERAK · HOTEL &amp; SPA</div>
+        <div className="login-hero">
           <h1>Merak</h1>
-          <p>إدارة الغرف والحجوزات والاستقبال والسبا والمطعم والحسابات من شاشة واحدة.</p>
+          <p className="login-tag">ضيافة راقية تُدار بإتقان، من الاستقبال إلى السبا والمطعم.</p>
+          <p>إدارة الغرف والحجوزات والحسابات من شاشة واحدة.</p>
         </div>
         <div className="login-feats">
-          <span>الحجوزات والاستقبال</span>
-          <span>السبا</span>
-          <span>المطعم وخدمة الغرف</span>
-          <span>الفواتير متعددة العملات</span>
-          <span>التقارير</span>
+          {[
+            [BedDouble, 'الغرف والحجوزات'],
+            [Flower2, 'السبا والمواعيد'],
+            [UtensilsCrossed, 'المطعم وخدمة الغرف'],
+            [Receipt, 'فواتير متعددة العملات'],
+          ].map(([Icon, text], i) => {
+            const I = Icon as typeof BedDouble;
+            return (
+              <div className="login-feat" style={{ ['--i' as string]: i }} key={text as string}>
+                <I size={18} /> {text as string}
+              </div>
+            );
+          })}
         </div>
       </section>
 
       <main className="login-panel">
-        <form className="login-card stack" onSubmit={submit} noValidate>
+        <form className={`login-card stack ${shake ? 'shake' : ''}`} onSubmit={submit} noValidate>
           <div>
             <div className="login-mark" aria-hidden="true">M</div>
             <h2>تسجيل الدخول</h2>
-            <p className="muted" style={{ margin: '4px 0 0' }}>مرحبًا بك في لوحة إدارة Merak.</p>
+            <p className="login-sub">مرحبًا بك في لوحة إدارة Merak.</p>
           </div>
 
           <div className="field">
@@ -88,7 +105,7 @@ export default function Login({ onLogin }: { onLogin: (u: string, p: string, rem
                 aria-invalid={error ? true : undefined}
                 aria-describedby={error ? 'login-err' : undefined}
               />
-              <IconButton label={show ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'} onClick={() => setShow((s) => !s)}>
+              <IconButton label={show ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'} onClick={() => setShow((v) => !v)}>
                 {show ? <EyeOff size={18} /> : <Eye size={18} />}
               </IconButton>
             </div>
@@ -105,9 +122,10 @@ export default function Login({ onLogin }: { onLogin: (u: string, p: string, rem
             </div>
           ) : null}
 
-          <Button type="submit" variant="primary" loading={busy} className="w-full">
-            <LogIn size={18} /> دخول
-          </Button>
+          <button type="submit" className="login-submit" disabled={busy}>
+            {busy ? <span className="spinner" style={{ width: 18, height: 18, borderWidth: 2 }} aria-hidden="true" /> : <LogIn size={18} />} دخول
+          </button>
+          <p className="login-note">الدخول لهذا الجهاز فقط. بياناتك محفوظة داخل المتصفح.</p>
         </form>
       </main>
     </div>

@@ -7,7 +7,7 @@
  */
 export const AUTH_USERNAME = 'merak';
 const AUTH_PASSWORD = '123456';
-const KEY = 'merak:session';
+const KEY = 'merak:session:v2';
 
 export function checkCredentials(username: string, password: string): boolean {
   return username.trim().toLowerCase() === AUTH_USERNAME && password === AUTH_PASSWORD;
